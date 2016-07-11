@@ -52,6 +52,22 @@ class SimpleTestCase(BaseTestCase):
         self.assertEqual(t.x, 300)
         self.assertEqual(t.y, 300)
 
+        t = self.BACKEND.get_thumbnail(item.image, '400', upscale=False)
+
+        self.assertEqual(t.x, 100)
+
+        t = self.BACKEND.get_thumbnail(item.image, '400', upscale=True)
+
+        self.assertEqual(t.x, 400)
+
+        t = self.BACKEND.get_thumbnail(item.image, 'x300', upscale=False)
+
+        self.assertEqual(t.y, 100)
+
+        t = self.BACKEND.get_thumbnail(item.image, 'x300', upscale=True)
+
+        self.assertEqual(t.y, 300)
+
     def test_upscale_and_crop(self):
         item = Item.objects.get(image='200x100.jpg')
 
