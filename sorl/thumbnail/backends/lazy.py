@@ -9,21 +9,42 @@ from django.utils.six.moves.urllib.parse import urljoin
 
 from sorl.thumbnail.base import ThumbnailBackend
 from sorl.thumbnail.conf import settings, defaults as default_settings
-from sorl.thumbnail.images import ImageFile, DummyImageFile
+from sorl.thumbnail.images import ImageFile, DummyImageFile, BaseImageFile
 from sorl.thumbnail import default
 
 
 logger = logging.getLogger(__name__)
 
 
+def get_file(file_):
+    file_url = getattr(file_, 'url', None) or ''
+    if file_url.startswith('http'):
+        return file_url
+
+    # in case of local filesystem
+    file_path = getattr(file_, 'path', None) or ''
+    if file_path:
+        return file_path
+
+    return file_
+
+
+class LazyThumbnail(BaseImageFile):
+    @property
+    def url(self):
+        return self._url
+
+    @url.setter
+    def url(self, value):
+        self._url = value
+
+
 class LazyBackend(ThumbnailBackend):
     def get_thumbnail(self, file_, geometry_string, **options):
         logger.debug('Getting thumbnail for file [%s] at [%s]', file_, geometry_string)
 
+        file_ = get_file(file_)
         if file_:
-            if not hasattr(file_, 'url') or not file_.url.startswith('http'):
-                raise Exception('Cannot use lazy generation')
-            file_ = file_.url
             source = ImageFile(file_)
         else:
             if settings.THUMBNAIL_DUMMY:
@@ -91,21 +112,21 @@ class LazyBackend(ThumbnailBackend):
         # will just leave that out for now.
         default.kvstore.get_or_set(source)
         # do not save thumbnail in kvstore!
+        thumb = LazyThumbnail()
+        thumb.size = thumbnail.size
         url_data = {'file_': file_,
                     'geometry_string': geometry_string,
                     'options': options}
         signed_data = signing.dumps(url_data,
                                     key=settings.THUMBNAIL_SECRET_KEY)
         if not settings.THUMBNAIL_SERVER_URL.startswith('http') or \
-            not settings.THUMBNAIL_SERVER_URL.endswith('/'):
+                not settings.THUMBNAIL_SERVER_URL.endswith('/'):
             raise ImproperlyConfigured(
                 'THUMBNAIL_SERVER_URL must start with "http" and end with "/"')
         url = urljoin(settings.THUMBNAIL_SERVER_URL, 'hash/') + signed_data
-        thumbnail.url = url
-        return thumbnail
+        thumb.url = url
+        return thumb
 
     def delete(self, file_, delete_file=True):
-        if not hasattr(file_, 'url') or not file_.url.startswith('http'):
-            raise Exception('Canmot use lazy generation')
-        file_ = file_.url
+        file_ = get_file(file_)
         super(LazyBackend, self).delete(file_, delete_file)

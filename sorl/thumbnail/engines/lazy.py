@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from PIL.Image import NORMAL, ANTIALIAS, NEAREST
+from PIL import Image
 
 from sorl.thumbnail.engines.base import EngineBase
-from sorl.thumbnail.images import BaseImageFile
 
 
 class SourceImagePlaceholder(object):
@@ -17,7 +16,7 @@ class SourceImagePlaceholder(object):
         self.size = (0, 0)
         self.palette = None
         self.info = {}
-        self.category = NORMAL
+        self.category = Image.NORMAL
         self.readonly = 0
         self.pyaccess = None
 
@@ -34,26 +33,16 @@ class SourceImagePlaceholder(object):
         self.size = (right - left, lower - upper)
         return self
 
-    def resize(self, size, resample=NEAREST):
+    def resize(self, size, resample=Image.NEAREST):
         self.size = size
         return self
-
-
-class LazyThumbnail(BaseImageFile):
-    @property
-    def url(self):
-        return self._url
-
-    @url.setter
-    def url(self, value):
-        self._url = value
 
 
 class Engine(EngineBase):
 
     def create(self, image, geometry, options):
         image = self.cropbox(image, geometry, options)
-        # image = self.orientation(image, geometry, options)
+        image = self.orientation(image, geometry, options)
         # image = self.colorspace(image, geometry, options)
         # image = self.remove_border(image, options)
         image = self.scale(image, geometry, options)
@@ -64,7 +53,8 @@ class Engine(EngineBase):
         return image
 
     def get_image(self, source):
-        # TODO maybe open with pillow to copy more information
+        # TODO maybe copy more information
+        source = Image.open(source)
         image = SourceImagePlaceholder()
         image.size = source.size
         return image
@@ -76,15 +66,13 @@ class Engine(EngineBase):
         return image.info or {}
 
     def write(self, image, options, thumbnail):
-        thumbnail = LazyThumbnail()
-        thumbnail.size = image.size
-        return thumbnail
+        pass
 
     def _cropbox(self, image, x, y, x2, y2):
         return image.crop((x, y, x2, y2))
 
     def _scale(self, image, width, height):
-        return image.resize((width, height), resample=ANTIALIAS)
+        return image.resize((width, height), resample=Image.ANTIALIAS)
 
     def _crop(self, image, width, height, x_offset, y_offset):
         return image.crop((x_offset, y_offset,
